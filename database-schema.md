@@ -32,10 +32,15 @@ name VARCHAR(255) NOT NULL
 address TEXT 
 state VARCHAR(100) 
 country VARCHAR(100) DEFAULT 'Nigeria' 
-status VARCHAR(20) DEFAULT 'pending' pending, active, expired, suspended
+status VARCHAR(20)  trial, free, premium_active, premium_expired, suspended
+tier	VARCHAR(20)	free, premium (derived from status, but useful for quick filtering)
+trial_start_date	DATE	NULL if not in trial
+trial_end_date	DATE	NULL if no trial or trial ended
+subscription_end_date	DATE	NULL for free/trial; set when premium paid
 subscription_plan VARCHAR(20) basic, standard, premium
 created_at TIMESTAMP DEFAULT NOW() 
 Index (status, subscription_plan) 
+
 
 2. users
 
@@ -194,7 +199,9 @@ end_date DATE NOT NULL
 payment_reference VARCHAR(255) 
 amount_paid DECIMAL(10,2) NOT NULL 
 Index (status, end_date) 
-
+-- Make school_id non-unique, add index
+ALTER TABLE subscriptions DROP CONSTRAINT subscriptions_school_id_key;  -- if it exists
+ALTER TABLE subscriptions ADD COLUMN is_current BOOLEAN DEFAULT TRUE;
 13. ad_campaigns
 
 For secondary monetisation (ads from vendors).
@@ -210,6 +217,15 @@ end_date DATE NOT NULL
 status VARCHAR(20) DEFAULT 'pending' pending, approved, rejected, active
 Index (status, start_date) 
 
+Feature Usage:
+CREATE TABLE feature_usage (
+    id SERIAL PRIMARY KEY,
+    school_id INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+    feature_name VARCHAR(50) NOT NULL,  -- e.g., 'ai_generations', 'exports'
+    usage_count INTEGER DEFAULT 0,
+    reset_date DATE NOT NULL,           -- typically current date
+    UNIQUE (school_id, feature_name, reset_date)
+);
 14. ad_analytics
 
 Daily ad performance.
@@ -249,7 +265,10 @@ created_at TIMESTAMP DEFAULT NOW()
 Index (school_id, created_at) 
 
 ---
-
+_ndexes
+CREATE INDEX idx_schools_status_tier ON schools(status, tier);
+CREATE INDEX idx_schools_trial_end ON schools(trial_end_date) WHERE status = 'trial';
+CREATE INDEX idx_feature_usage_reset ON feature_usage(reset_date);_
 Relationships Diagram
 
 ```
